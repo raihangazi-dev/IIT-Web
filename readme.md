@@ -1,36 +1,81 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# IIT — Institute of International Trade
+
+Alumni network web application built with Next.js 15 (App Router), React 19, Tailwind CSS v4, and shadcn/ui.
 
 ## Getting Started
 
-First, run the development server:
-
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Environment Variables
 
-## Learn More
+Copy `.env.example` to `.env.local` and fill in the values before running the app.
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+cp .env.example .env.local
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### `.env.local` reference
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```env
+# ── App ───────────────────────────────────────────────────────────────────────
+NEXT_PUBLIC_APP_URL=http://localhost:3000
 
-## Deploy on Vercel
+# ── Auth (NextAuth / your auth provider) ─────────────────────────────────────
+NEXTAUTH_SECRET=replace-with-a-random-secret
+NEXTAUTH_URL=http://localhost:3000
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+# ── Database ─────────────────────────────────────────────────────────────────
+DATABASE_URL=postgresql://user:password@localhost:5432/iit_db
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+# ── Email (for password reset / verification emails) ─────────────────────────
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your-sender@gmail.com
+SMTP_PASS=your-app-password
+SMTP_FROM="IIT Alumni <no-reply@iit.org>"
+```
+
+---
+
+## Test Accounts
+
+> These credentials are for **local development only**. Do not use in production.
+
+| Role            | Email                        | Password       | Notes                              |
+| --------------- | ---------------------------- | -------------- | ---------------------------------- |
+| Admin           | admin@iit-test.com           | Admin@1234     | Full admin panel access            |
+| Verified Alumni | alumni@iit-test.com          | Alumni@1234    | Unlocks alumni directory & forum   |
+| Pending User    | pending@iit-test.com         | Pending@1234   | Application under review           |
+| Guest           | *(no login required)*        | —              | Public pages only                  |
+
+> To test the **forgot password** flow, use any email above. The reset link is logged to the console in development (no real email sent until SMTP is configured).
+
+---
+
+## Pages
+
+| Route                  | Description                              |
+| ---------------------- | ---------------------------------------- |
+| `/`                    | Homepage                                 |
+| `/login`               | Sign in                                  |
+| `/register`            | Create account                           |
+| `/forgot-password`     | Request password reset link              |
+| `/reset-password`      | Set new password (requires `?token=`)    |
+| `/alumni`              | Alumni directory (guest + member views)  |
+| `/alumni/apply`        | Alumni membership application form       |
+| `/admin/alumni`        | Admin — alumni management panel          |
+
+---
+
+## Tech Stack
+
+- **Framework**: Next.js 15 (App Router)
+- **UI**: React 19, Tailwind CSS v4, shadcn/ui
+- **Fonts**: Playfair Display (headings), DM Sans (body)
+- **Icons**: Lucide React
