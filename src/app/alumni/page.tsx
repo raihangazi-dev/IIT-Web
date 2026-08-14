@@ -1,7 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
+import { useSession } from "next-auth/react"
 import { TopNav } from "@/components/layout/top-nav"
 import { Footer } from "@/components/layout/footer"
 import { Hero } from "@/components/shared/hero"
@@ -15,67 +16,81 @@ import { EventCard } from "@/components/cards/event-card"
 import { StoryCard } from "@/components/cards/story-card"
 import { Input } from "@/components/ui/input"
 import { Select } from "@/components/ui/select"
-
-const alumniData = [
-  {
-    initials: "RA",
-    name: "Rafiq Ahmed",
-    role: "Trade Finance Manager",
-    org: "Standard Bank · Batch 2019",
-    badgeVariant: "verified" as const,
-    contact: { email: "rafiq.ahmed@email.com", phone: "+880 1XXX-XXXXXX" },
-  },
-  {
-    initials: "MI",
-    avatarColor: "#946c00",
-    name: "M. Islam",
-    role: "CDCS Instructor, 22 yrs banking",
-    org: "Islami Bank",
-    badgeVariant: "honorary" as const,
-    contact: { email: "m.islam@email.com" },
-  },
-  {
-    initials: "KH",
-    name: "Karim Hasan",
-    role: "CDCS Certified",
-    org: "Contic Bank · Batch 2021",
-    badgeVariant: "verified" as const,
-    contact: { email: "karim.hasan@email.com", phone: "+880 1XXX-XXXXXX" },
-  },
-  {
-    initials: "SA",
-    name: "Sumaiya Akter",
-    role: "Trade Compliance Lead",
-    org: "Prime Bank · Batch 2020",
-    badgeVariant: "verified" as const,
-    contact: { email: "sumaiya.akter@email.com" },
-  },
-]
+import {
+  getAlumniDirectory,
+  getAlumniPreview,
+  getAlumniStats,
+  getMyApplication,
+  type AlumniDirectoryEntry,
+  type AlumniPreviewEntry,
+  type AlumniStats,
+  type MyApplicationStatus,
+} from "@/lib/api"
 
 export default function AlumniPage() {
-  const [isAlumni, setIsAlumni] = useState(false)
+  const { data: session, status } = useSession()
+  const isLoggedIn = status === "authenticated"
+  const isAlumni = session?.user?.role === "ALUMNI" || session?.user?.role === "ADMIN"
+  const isPendingApplicant = isLoggedIn && !isAlumni
+
+  const [stats, setStats] = useState<AlumniStats | null>(null)
+  const [preview, setPreview] = useState<AlumniPreviewEntry[]>([])
+  const [directory, setDirectory] = useState<AlumniDirectoryEntry[]>([])
+  const [directoryLoaded, setDirectoryLoaded] = useState(false)
+  const [search, setSearch] = useState("")
+  const [certification, setCertification] = useState("")
+  const [country, setCountry] = useState("")
+  const [myApplication, setMyApplication] = useState<MyApplicationStatus | null>(null)
+  const [myApplicationLoaded, setMyApplicationLoaded] = useState(false)
+
+  useEffect(() => {
+    getAlumniStats().then(setStats).catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    if (isAlumni) return
+    getAlumniPreview().then(setPreview).catch(() => {})
+  }, [isAlumni])
+
+  useEffect(() => {
+    if (!isPendingApplicant || !session?.accessToken) return
+    getMyApplication(session.accessToken)
+      .then(setMyApplication)
+      .catch(() => setMyApplication(null))
+      .finally(() => setMyApplicationLoaded(true))
+  }, [isPendingApplicant, session?.accessToken])
+
+  useEffect(() => {
+    if (!isAlumni || !session?.accessToken) return
+    const token = session.accessToken
+    // Fetch immediately on first load (or when filters are cleared back to empty);
+    // debounce only kicks in once the alumni has actually typed a search term.
+    const delay = search || certification || country ? 250 : 0
+    const timeout = setTimeout(() => {
+      getAlumniDirectory(token, { search, certification, country })
+        .then(setDirectory)
+        .catch(() => {})
+        .finally(() => setDirectoryLoaded(true))
+    }, delay)
+    return () => clearTimeout(timeout)
+  }, [isAlumni, session?.accessToken, search, certification, country])
+
+  if (status === "loading") {
+    return (
+      <>
+        <TopNav />
+        <main className="pt-20 min-h-[60vh] flex items-center justify-center text-muted-foreground text-sm">
+          Loading…
+        </main>
+        <Footer />
+      </>
+    )
+  }
 
   return (
     <>
       <TopNav />
       <main className="pt-20">
-
-        {/* Demo state toggle — remove when auth is wired up */}
-        <div className="bg-muted border-b border-border px-8 py-2 flex items-center justify-center gap-3 text-[12.5px] text-muted-foreground">
-          <span>Demo view:</span>
-          <button
-            onClick={() => setIsAlumni(false)}
-            className={`px-3 py-1 rounded font-semibold transition-colors ${!isAlumni ? "bg-navy text-white" : "hover:text-foreground"}`}
-          >
-            Guest
-          </button>
-          <button
-            onClick={() => setIsAlumni(true)}
-            className={`px-3 py-1 rounded font-semibold transition-colors ${isAlumni ? "bg-primary text-primary-foreground" : "hover:text-foreground"}`}
-          >
-            Verified Alumni
-          </button>
-        </div>
 
         {/* Hero */}
         <Hero
@@ -87,48 +102,96 @@ export default function AlumniPage() {
         {/* Stats */}
         <StatBar
           stats={[
-            { value: "278", label: "Registered Alumni" },
-            { value: "18", label: "Countries Represented" },
-            { value: "64", label: "Certified Alumni" },
+            { value: stats ? String(stats.registeredAlumni) : "—", label: "Registered Alumni" },
+            { value: stats ? String(stats.countries) : "—", label: "Countries Represented" },
+            { value: stats ? String(stats.certifiedAlumni) : "—", label: "Certified Alumni" },
             { value: "12", label: "Alumni Events / Year" },
           ]}
         />
 
-        {/* ── STATE A: Guest ── */}
-        {!isAlumni && (
+        {/* ── STATE A: Guest / logged-in non-alumni ── */}
+        {!isAlumni && (!isPendingApplicant || myApplicationLoaded) && (
           <section className="py-16">
             <div className="max-w-[1180px] mx-auto px-6">
-              <div className="text-center mb-10">
-                <h2 className="font-heading text-[30px] text-navy mb-2">Join the Network</h2>
-                <p className="text-sm text-muted-foreground">
-                  Sign in with your alumni account, or apply if this is your first time here.
-                </p>
-              </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-[840px] mx-auto">
-                <GateCard
-                  variant="primary"
-                  tag="Already a member"
-                  title="Sign In"
-                  description="Access the full alumni directory, contact details, events, and the private discussion forum."
-                  buttonLabel="Sign In as Alumni"
-                  buttonHref="/login"
-                />
-                <GateCard
-                  variant="outline"
-                  tag="First time here"
-                  title="Apply for Membership"
-                  description="Submit your details for admin verification. Most applications are reviewed within 3–5 business days."
-                  buttonLabel="Start Application"
-                  buttonHref="/alumni/apply"
-                />
-              </div>
+              {isPendingApplicant && myApplication?.status === "PENDING" ? (
+                <div className="max-w-[560px] mx-auto text-center bg-card border border-border rounded-xl p-10">
+                  <div className="w-14 h-14 rounded-full bg-warning-bg flex items-center justify-center mx-auto mb-5">
+                    <span className="text-2xl">⏳</span>
+                  </div>
+                  <h2 className="font-heading text-[26px] text-navy mb-2">Application under review</h2>
+                  <p className="text-sm text-muted-foreground">
+                    Thanks, {session?.user?.name}. Your alumni application (submitted{" "}
+                    {new Date(myApplication.appliedAt).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    })}
+                    ) is with IIT admin for review — typically 3–5 business days. You'll gain full
+                    directory access as soon as it's approved.
+                  </p>
+                </div>
+              ) : isPendingApplicant && myApplication?.status === "REJECTED" ? (
+                <div className="max-w-[560px] mx-auto text-center bg-card border border-border rounded-xl p-10">
+                  <h2 className="font-heading text-[26px] text-navy mb-2">Application not approved</h2>
+                  <p className="text-sm text-muted-foreground mb-6">
+                    {myApplication.rejectionReason ||
+                      "Your previous alumni application wasn't approved. You're welcome to reapply with updated details."}
+                  </p>
+                  <Link
+                    href="/alumni/apply"
+                    className="inline-flex items-center justify-center bg-primary text-primary-foreground rounded-lg px-6 py-3 text-[14px] font-semibold hover:bg-primary/90 transition-opacity"
+                  >
+                    Reapply for Membership →
+                  </Link>
+                </div>
+              ) : (
+                <>
+                  <div className="text-center mb-10">
+                    <h2 className="font-heading text-[30px] text-navy mb-2">
+                      {isPendingApplicant ? "Apply for Alumni Membership" : "Join the Network"}
+                    </h2>
+                    <p className="text-sm text-muted-foreground">
+                      {isPendingApplicant
+                        ? `Welcome, ${session?.user?.name}. You're signed in but haven't applied for alumni membership yet.`
+                        : "Sign in with your alumni account, or apply if this is your first time here."}
+                    </p>
+                  </div>
 
-              <p className="max-w-[840px] mx-auto mt-[22px] text-center text-[12.5px] text-muted-foreground">
-                Honorary members are added directly by IIT admin and do not need to apply. If you believe
-                you already have alumni access, contact{" "}
-                <strong className="text-navy">iitrade.org@gmail.com</strong>.
-              </p>
+                  <div
+                    className={
+                      isPendingApplicant
+                        ? "max-w-[420px] mx-auto"
+                        : "grid grid-cols-1 md:grid-cols-2 gap-6 max-w-[840px] mx-auto"
+                    }
+                  >
+                    {!isPendingApplicant && (
+                      <GateCard
+                        variant="primary"
+                        tag="Already a member"
+                        title="Sign In"
+                        description="Access the full alumni directory, contact details, events, and the private discussion forum."
+                        buttonLabel="Sign In as Alumni"
+                        buttonHref="/login"
+                      />
+                    )}
+                    <GateCard
+                      variant="outline"
+                      tag="First time here"
+                      title="Apply for Membership"
+                      description="Submit your details for admin verification. Most applications are reviewed within 3–5 business days."
+                      buttonLabel="Start Application"
+                      buttonHref="/alumni/apply"
+                    />
+                  </div>
+
+                  <p className="max-w-[840px] mx-auto mt-[22px] text-center text-[12.5px] text-muted-foreground">
+                    Honorary members are added directly by IIT admin and do not need to apply. If you believe
+                    you already have alumni access, contact{" "}
+                    <strong className="text-navy">iitrade.org@gmail.com</strong>.
+                  </p>
+                </>
+              )}
 
               {/* Locked directory preview */}
               <div className="mt-14">
@@ -137,13 +200,8 @@ export default function AlumniPage() {
                   description="Sign in as a verified alumni member to view full profiles and contact information."
                 >
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-[18px]">
-                    {[
-                      { initials: "RA", name: "Rafiq Ahmed", role: "Trade Finance Manager", org: "Standard Bank" },
-                      { initials: "NI", name: "Nafisa Islam", role: "Head of Trade Ops", org: "HSBC Bangladesh" },
-                      { initials: "KH", name: "Karim Hasan", role: "CDCS Certified", org: "Contic Bank" },
-                      { initials: "SA", name: "Sumaiya Akter", role: "Compliance Lead", org: "Prime Bank" },
-                    ].map((a) => (
-                      <div key={a.initials} className="bg-card border border-border rounded-xl p-[22px] text-center">
+                    {preview.map((a) => (
+                      <div key={a.initials + a.name} className="bg-card border border-border rounded-xl p-[22px] text-center">
                         <Avatar initials={a.initials} className="mx-auto mb-3" />
                         <div className="text-sm font-bold text-navy mb-[2px]">{a.name}</div>
                         <div className="text-xs text-muted-foreground mb-[2px]">{a.role}</div>
@@ -171,23 +229,41 @@ export default function AlumniPage() {
 
                 {/* Filters */}
                 <div className="flex gap-3 mb-7 flex-wrap">
-                  <Input placeholder="Search alumni by name, company…" className="flex-1 min-w-[200px]" />
-                  <Select className="w-auto min-w-[180px]">
-                    <option>All Certifications</option>
-                    <option>CDCS</option>
-                    <option>CSDG</option>
-                    <option>CITF</option>
+                  <Input
+                    placeholder="Search alumni by name, company…"
+                    className="flex-1 min-w-[200px]"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                  />
+                  <Select
+                    className="w-auto min-w-[180px]"
+                    value={certification}
+                    onChange={(e) => setCertification(e.target.value)}
+                  >
+                    <option value="">All Certifications</option>
+                    <option value="CDCS">CDCS</option>
+                    <option value="CSDG">CSDG</option>
+                    <option value="CITF">CITF</option>
                   </Select>
-                  <Select className="w-auto min-w-[160px]">
-                    <option>All Countries</option>
-                    <option>Bangladesh</option>
-                    <option>Singapore</option>
+                  <Select
+                    className="w-auto min-w-[160px]"
+                    value={country}
+                    onChange={(e) => setCountry(e.target.value)}
+                  >
+                    <option value="">All Countries</option>
+                    <option value="Bangladesh">Bangladesh</option>
+                    <option value="Singapore">Singapore</option>
                   </Select>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-[18px]">
-                  {alumniData.map((a) => (
-                    <AlumCard key={a.initials} {...a} />
+                  {directoryLoaded && directory.length === 0 && (
+                    <p className="col-span-full text-center text-sm text-muted-foreground py-10">
+                      No alumni found.
+                    </p>
+                  )}
+                  {directory.map((a) => (
+                    <AlumCard key={a.contact.email} {...a} />
                   ))}
                 </div>
               </div>

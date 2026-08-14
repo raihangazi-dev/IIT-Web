@@ -8,6 +8,7 @@ import { AuthLayout } from "@/components/layout/auth-layout"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
+import { ApiError, resetPassword } from "@/lib/api"
 
 // ── Left panel ────────────────────────────────────────────────────────────────
 
@@ -116,6 +117,7 @@ function ResetPasswordContent() {
   const [errors, setErrors] = useState<FormErrors>({})
   const [isLoading, setIsLoading] = useState(false)
   const [success, setSuccess] = useState(false)
+  const [formError, setFormError] = useState("")
 
   const strength = getStrength(password)
 
@@ -134,19 +136,26 @@ function ResetPasswordContent() {
     return errs
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     const errs = validate()
     if (Object.keys(errs).length > 0) {
       setErrors(errs)
       return
     }
+    if (!token) return
+    setFormError("")
     setIsLoading(true)
-    // Replace with real API call — pass `token` + `password`
-    setTimeout(() => {
-      setIsLoading(false)
+    try {
+      await resetPassword({ token, password })
       setSuccess(true)
-    }, 1400)
+    } catch (error) {
+      setFormError(
+        error instanceof ApiError ? error.message : "Something went wrong. Please try again."
+      )
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   // Invalid / missing token
@@ -203,6 +212,12 @@ function ResetPasswordContent() {
 
           <form onSubmit={handleSubmit} noValidate>
             <div className="space-y-5">
+
+              {formError && (
+                <p className="text-[13px] text-destructive bg-destructive/10 rounded-lg px-3.5 py-2.5">
+                  {formError}
+                </p>
+              )}
 
               {/* New password */}
               <div>

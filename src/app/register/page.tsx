@@ -7,6 +7,7 @@ import { AuthLayout } from "@/components/layout/auth-layout"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
+import { ApiError, registerUser } from "@/lib/api"
 
 // ── Password strength ─────────────────────────────────────────────────────────
 
@@ -144,25 +145,30 @@ export default function RegisterPage() {
   const [showConfirm, setShowConfirm] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [success, setSuccess] = useState(false)
+  const [formError, setFormError] = useState("")
 
   function set<K extends keyof FormState>(field: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [field]: value }))
     setErrors((prev) => ({ ...prev, [field]: undefined }))
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     const errs = validate(form)
     if (Object.keys(errs).length > 0) {
       setErrors(errs)
       return
     }
+    setFormError("")
     setIsLoading(true)
-    // Replace with real registration call
-    setTimeout(() => {
-      setIsLoading(false)
+    try {
+      await registerUser({ name: form.name, email: form.email, password: form.password })
       setSuccess(true)
-    }, 1500)
+    } catch (error) {
+      setFormError(error instanceof ApiError ? error.message : "Something went wrong. Please try again.")
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   if (success) {
@@ -213,6 +219,12 @@ export default function RegisterPage() {
 
         <form onSubmit={handleSubmit} noValidate>
           <div className="space-y-5">
+
+            {formError && (
+              <p className="text-[13px] text-destructive bg-destructive/10 rounded-lg px-3.5 py-2.5">
+                {formError}
+              </p>
+            )}
 
             {/* Full name */}
             <div>

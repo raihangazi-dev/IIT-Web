@@ -1,5 +1,8 @@
+"use client"
+
 import { cn } from "@/lib/utils"
 import Link from "next/link"
+import { signOut, useSession } from "next-auth/react"
 
 interface NavLink {
   label: string
@@ -19,6 +22,8 @@ const defaultLinks: NavLink[] = [
 ]
 
 export function TopNav({ links = defaultLinks, className }: TopNavProps) {
+  const { data: session, status } = useSession()
+
   return (
     <nav className={cn(
       "fixed top-0 w-full z-50 bg-card border-b border-border",
@@ -41,17 +46,48 @@ export function TopNav({ links = defaultLinks, className }: TopNavProps) {
             ))}
           </div>
         </div>
-        <div className="flex items-center gap-4">
-          <Link href="/login" className="text-nav text-muted-foreground hover:text-gold transition-colors duration-200">
-            Login
-          </Link>
-          <Link
-            href="/apply"
-            className="bg-primary text-primary-foreground text-nav px-5 py-2.5 rounded-lg hover:bg-primary/90 transition-opacity"
-          >
-            Apply Now
-          </Link>
-        </div>
+
+        {status === "authenticated" && session.user ? (
+          <div className="flex items-center gap-4">
+            {session.user.role === "ADMIN" && (
+              <Link
+                href="/admin/alumni"
+                className="text-nav text-muted-foreground hover:text-gold transition-colors duration-200"
+              >
+                Admin Panel
+              </Link>
+            )}
+            {session.user.role === "USER" && (
+              <Link
+                href="/alumni/apply"
+                className="text-nav text-muted-foreground hover:text-gold transition-colors duration-200"
+              >
+                Apply for Membership
+              </Link>
+            )}
+            <span className="text-nav text-navy font-semibold hidden sm:inline">
+              {session.user.name}
+            </span>
+            <button
+              onClick={() => signOut({ callbackUrl: "/" })}
+              className="bg-primary text-primary-foreground text-nav px-5 py-2.5 rounded-lg hover:bg-primary/90 transition-opacity"
+            >
+              Sign out
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-4">
+            <Link href="/login" className="text-nav text-muted-foreground hover:text-gold transition-colors duration-200">
+              Login
+            </Link>
+            <Link
+              href="/alumni/apply"
+              className="bg-primary text-primary-foreground text-nav px-5 py-2.5 rounded-lg hover:bg-primary/90 transition-opacity"
+            >
+              Apply Now
+            </Link>
+          </div>
+        )}
       </div>
     </nav>
   )

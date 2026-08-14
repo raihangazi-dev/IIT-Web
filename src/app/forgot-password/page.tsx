@@ -7,6 +7,7 @@ import { AuthLayout } from "@/components/layout/auth-layout"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
+import { forgotPassword } from "@/lib/api"
 
 // ── Left panel ────────────────────────────────────────────────────────────────
 
@@ -98,7 +99,7 @@ export default function ForgotPasswordPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [submitted, setSubmitted] = useState(false)
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!email) {
       setError("Email is required.")
@@ -110,11 +111,14 @@ export default function ForgotPasswordPage() {
     }
     setError("")
     setIsLoading(true)
-    // Replace with real API call
-    setTimeout(() => {
-      setIsLoading(false)
+    try {
+      await forgotPassword(email)
       setSubmitted(true)
-    }, 1400)
+    } catch {
+      setError("Something went wrong. Please try again.")
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (

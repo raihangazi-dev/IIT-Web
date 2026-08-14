@@ -2,6 +2,8 @@
 
 import { useState } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { getSession, signIn } from "next-auth/react"
 import { Eye, EyeOff, Mail, Lock } from "lucide-react"
 import { AuthLayout } from "@/components/layout/auth-layout"
 import { Input } from "@/components/ui/input"
@@ -75,26 +77,40 @@ function validate(form: FormState): FormErrors {
 }
 
 export default function LoginPage() {
+  const router = useRouter()
   const [form, setForm] = useState<FormState>({ email: "", password: "", rememberMe: false })
   const [errors, setErrors] = useState<FormErrors>({})
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [formError, setFormError] = useState("")
 
   function set(field: keyof FormState, value: string | boolean) {
     setForm((prev) => ({ ...prev, [field]: value }))
     setErrors((prev) => ({ ...prev, [field]: undefined }))
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     const errs = validate(form)
     if (Object.keys(errs).length > 0) {
       setErrors(errs)
       return
     }
+    setFormError("")
     setIsLoading(true)
-    // Replace with real auth call
-    setTimeout(() => setIsLoading(false), 1500)
+    const result = await signIn("credentials", {
+      email: form.email,
+      password: form.password,
+      redirect: false,
+    })
+    setIsLoading(false)
+    if (result?.error) {
+      setFormError("Invalid email or password.")
+      return
+    }
+    const session = await getSession()
+    router.push(session?.user?.role === "ADMIN" ? "/admin/alumni" : "/alumni")
+    router.refresh()
   }
 
   return (
@@ -107,6 +123,12 @@ export default function LoginPage() {
 
         <form onSubmit={handleSubmit} noValidate>
           <div className="space-y-5">
+
+            {formError && (
+              <p className="text-[13px] text-destructive bg-destructive/10 rounded-lg px-3.5 py-2.5">
+                {formError}
+              </p>
+            )}
 
             {/* Email */}
             <div>
